@@ -1,23 +1,64 @@
-# Lakehouse Analyst Agent (step 1)
+# Lakehouse Analyst Agent
 
 Answers plain-English questions about data in watsonx.data. It finds the right catalog,
 schema and tables by itself, writes SQL, recovers from errors, and sanity-checks its results.
 
-## Run it
+## Setup (one time)
+
+**1. Prerequisites:** [uv](https://docs.astral.sh/uv/), an AWS account with Claude enabled on
+Amazon Bedrock, and an IBM watsonx.data instance.
+
+**2. Create `.mcp.json` at the repo root** (two folders above `agent.py`). It tells the agent
+how to reach the watsonx.data MCP server. Keep secrets as `${VAR}` placeholders. They're filled
+in from environment variables when the agent runs, so the file never holds a real token.
+**Don't commit this file.**
+
+```json
+{
+  "mcpServers": {
+    "watsonx.data-mcp-server": {
+      "type": "http",
+      "url": "https://<region>.lakehouse.cloud.ibm.com/api/v1/watsonxdata/mcp",
+      "headers": {
+        "authorization": "Basic ${WXD_AUTH}",
+        "authinstanceid": "${WXD_INSTANCE_ID}"
+      }
+    }
+  }
+}
+```
+
+**3. Install the `ask-lake` command** (optional). This puts it on your PATH so it runs from
+any directory:
 
 ```bash
 cd agents/analyst
-uv run python agent.py "What tables are in the tpchdbiceberg schema?"   # one question
-uv run python agent.py                                                   # interactive (follow-ups remember context)
+chmod +x ask-lake
+ln -s "$PWD/ask-lake" ~/.local/bin/ask-lake   # ~/.local/bin must be on your PATH
 ```
 
-Required environment variables (outside Claude Code, export them in your shell):
+**4. Set environment variables:**
 
 | Variable | Used for |
 |---|---|
-| `AWS_BEARER_TOKEN_BEDROCK`, `AWS_REGION` | Calling Claude on Amazon Bedrock. Claude Code sets these from `~/.claude/settings.json`; your own terminal doesn't. |
-| `WXD_AUTH` | Referenced as `${WXD_AUTH}` in `../../.mcp.json` for the watsonx.data MCP server |
-| `WXD_MCP_CONFIG` *(optional)* | Path to a different `.mcp.json` |
+| `AWS_BEARER_TOKEN_BEDROCK`, `AWS_REGION` | Calling Claude on Amazon Bedrock. `ask-lake` reads these from `~/.claude/settings.json` (the `env` block) if they aren't exported. |
+| `WXD_AUTH`, `WXD_INSTANCE_ID` | Substituted into the `${...}` placeholders in `.mcp.json` |
+| `WXD_MCP_CONFIG` *(optional)* | Path to an `.mcp.json` somewhere other than the repo root |
+
+## Run it
+
+```bash
+ask-lake "What tables are in the tpchdbiceberg schema?"   # one question
+ask-lake                                                  # interactive (follow-ups remember context)
+```
+
+Without the wrapper: `cd agents/analyst && uv run python agent.py "..."`.
+
+Inside Claude Code, prefix with `!` (`! ask-lake "..."`), or use the `@ask-lake` subagent
+(`.claude/agents/ask-lake.md`), which relays your question to this agent.
+
+**Output:** in a terminal, colors are shown and the Markdown answer is rendered. When the output
+is captured (a pipe, a log, or Claude Code's `!`), it's plain text. Set `NO_COLOR=1` to force plain.
 
 ## How it works: the concepts
 
