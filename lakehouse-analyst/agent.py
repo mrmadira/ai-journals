@@ -50,6 +50,7 @@ MODEL = "anthropic.claude-opus-5-5"            # Bedrock model IDs carry the "an
 FALLBACK_MODEL = "anthropic.claude-opus-4-8"   # used only if the primary model declines a request
 MAX_STEPS = int(os.environ.get("ANALYST_MAX_STEPS", 25))         # hard stop for a confused agent
 MAX_ROWS = 200                                                   # rows any query may return
+PREVIEW_ROWS = 20                                                # rows an unfiltered raw-row query may return
 MAX_SCAN_ROWS = float(os.environ.get("ANALYST_MAX_SCAN_ROWS", 1e9))  # EXPLAIN-estimated rows a query may touch
 QUERY_TIMEOUT_S = float(os.environ.get("ANALYST_QUERY_TIMEOUT_S", 120))
 MAX_PARALLEL_QUERIES = int(os.environ.get("ANALYST_MAX_PARALLEL_QUERIES", 2))
@@ -109,6 +110,15 @@ RECORD_FINDING_TOOL = {
 BASE_PROMPT = f"""You are a data analyst agent for an IBM watsonx.data lakehouse.
 Answer the user's question using the tools; never invent data.
 
+Triage the request BEFORE exploring:
+- You are an analysis tool, not a data-export tool. If the user asks for "all rows", a full
+  table, a dump or an export, don't fetch it and don't explore first. Reply right away that
+  you return at most {MAX_ROWS} rows (and raw unfiltered rows only as a short preview), then
+  offer concrete alternatives and ask which they want: a row count, a 10-row sample, summary
+  statistics per column, or a filtered subset (suggest filters). Once they choose, proceed.
+- If the question doesn't say which dataset it means and more than one could fit, ask first
+  (rule 4).
+
 How to work:
 1. Read the Lakehouse context below first. It names canonical datasets, metric definitions
    and known data issues - follow it over your own assumptions.
@@ -118,6 +128,8 @@ How to work:
 4. Ambiguity: if the question could refer to more than one dataset, metric or time range and
    the context doesn't settle it, do NOT pick one silently. Stop and ask one short clarifying
    question listing the options you found (name each catalog.schema). Don't run queries first.
+   A default in the context applies only when the user names that dataset (e.g. says "TPC-H");
+   a generic word like "customers" or "sales" doesn't name a dataset, so ask.
 5. Query with execute-select. Rules enforced by the system:
    - only a single statement starting with SELECT (no WITH/CTEs - use subqueries);
    - always use fully qualified table names: catalog.schema.table;
@@ -198,6 +210,16 @@ def to_claude_tool(mcp_tool) -> dict:
     }
 
 
+def is_raw_row_dump(sql: str) -> bool:
+    """True for queries that just pull raw rows: no filter, no aggregation, no grouping.
+
+    Those get capped to a short preview no matter what the model asks for, so "show me the
+    whole table" can't turn into fetching (and pushing through the model) as much as possible.
+    """
+    s = re.sub(r"'(?:[^']|'')*'", "''", sql.lower())  # ignore keywords inside string literals
+    return not re.search(r"\b(where|group\s+by|having|count|sum|avg|min|max|approx_\w+|distinct|join)\b", s)
+
+
 def max_row_estimate(explain_output: str) -> float | None:
     """Largest outputRowCount anywhere in a Presto distributed plan, or None if there are no stats.
 
@@ -229,14 +251,11 @@ class Tools:
 
     async def scan_budget_check(self, args: dict) -> str | None:
         """Guardrail #4 - EXPLAIN the query and refuse it if the plan would touch too many rows."""
-        try:
-            plan, is_error = mcp_text(await self.mcp.call_tool(
-                "watsonxdata-explain-query",
-                {"engine_id": args.get("engine_id", ""), "statement": args["sql"], "type": "distributed", "format": "json"},
-                read_timeout_seconds=QUERY_TIMEOUT_S,
-            ))
-        except Exception as e:  # protocol error / timeout: fail CLOSED - unknown cost means no run
-            plan, is_error = f"{type(e).__name__}: {getattr(e, 'message', e)} {getattr(e, 'data', '') or ''}", True
+        # call_mcp retries one transient server error; if it still fails we fail CLOSED below.
+        plan, is_error = await self.call_mcp(
+            "watsonxdata-explain-query",
+            {"engine_id": args.get("engine_id", ""), "statement": args["sql"], "type": "distributed", "format": "json"},
+        )
         if is_error:
             return ("Query refused: the pre-flight EXPLAIN failed, so its cost is unknown. Use fully "
                     f"qualified names (catalog.schema.table) and valid SQL. EXPLAIN said: {plan[:600]}")
@@ -258,8 +277,42 @@ class Tools:
                 return "Only a single SELECT statement is allowed."
             args["sql"] = sql
             args["limit"] = min(int(args.get("limit") or MAX_ROWS), MAX_ROWS)  # cap rows
+            if is_raw_row_dump(sql):  # Guardrail #5 - no unfiltered table dumps, only a preview
+                args["limit"] = min(args["limit"], PREVIEW_ROWS)
+                args["_preview"] = True
             return await self.scan_budget_check(args)
         return None
+
+    async def call_mcp(self, name: str, args: dict) -> tuple[str, bool]:
+        """Call an MCP tool with an accurate error message and one retry for transient server errors.
+
+        Every allowed tool is read-only, so retrying is safe. Timeouts are NOT retried: a slow
+        query will just be slow again, and retrying would double the load on the engine.
+        """
+        args = {k: v for k, v in args.items() if not k.startswith("_")}  # strip internal flags
+        for attempt in (1, 2):
+            started = asyncio.get_running_loop().time()
+            try:
+                if name == "watsonxdata-execute-select":
+                    async with self.query_slots:  # at most N queries in flight
+                        result = await self.mcp.call_tool(name, args, read_timeout_seconds=QUERY_TIMEOUT_S)
+                else:
+                    result = await self.mcp.call_tool(name, args, read_timeout_seconds=QUERY_TIMEOUT_S)
+                return mcp_text(result)
+            except Exception as e:
+                elapsed = asyncio.get_running_loop().time() - started
+                if isinstance(e, TimeoutError) or elapsed >= QUERY_TIMEOUT_S - 1:
+                    return (f"Timed out after {QUERY_TIMEOUT_S:.0f}s. The query is too slow for this engine: "
+                            "narrow it (filters, smaller table, sampling) rather than retrying."), True
+                detail = " ".join(str(x) for x in (getattr(e, "message", None) or e, getattr(e, "data", None) or "") if x)
+                if attempt == 1:
+                    self.log.write(self.ref, "retry", tool=name, error=detail[:300])
+                    print(f"   ↻ server error after {elapsed:.1f}s, retrying once: {detail[:100]}")
+                    await asyncio.sleep(2)
+                    continue
+                return (f"watsonx.data MCP server error after {elapsed:.1f}s (failed twice, not a timeout): "
+                        f"{detail}. The server may be having trouble; try a different approach or tell the user."), True
+        raise AssertionError("unreachable")
 
     def record_finding(self, args: dict) -> str:
         """The local memory tool: append to notes.md for the provider to review."""
@@ -283,15 +336,10 @@ class Tools:
             if error:
                 text, is_error = error, True
             else:
-                try:
-                    if block.name == "watsonxdata-execute-select":
-                        async with self.query_slots:  # at most N queries in flight
-                            result = await self.mcp.call_tool(block.name, args, read_timeout_seconds=QUERY_TIMEOUT_S)
-                    else:
-                        result = await self.mcp.call_tool(block.name, args, read_timeout_seconds=QUERY_TIMEOUT_S)
-                    text, is_error = mcp_text(result)
-                except Exception as e:  # timeout / network failure: tell the model, let it decide
-                    text, is_error = f"Tool call failed or timed out after {QUERY_TIMEOUT_S:.0f}s: {e}", True
+                text, is_error = await self.call_mcp(block.name, args)
+                if not is_error and block.name == "watsonxdata-execute-select" and args.get("_preview"):
+                    text += (f"\n[Note from the system: unfiltered raw-row query, so the result was capped "
+                             f"to a {PREVIEW_ROWS}-row preview. Tell the user it's a preview, not the full table.]")
         if len(text) > MAX_RESULT_CHARS:
             text = text[:MAX_RESULT_CHARS] + f"\n...[truncated {len(text) - MAX_RESULT_CHARS} chars]"
         self.log.write(self.ref, "tool_result", tool=block.name, is_error=is_error, chars=len(text),

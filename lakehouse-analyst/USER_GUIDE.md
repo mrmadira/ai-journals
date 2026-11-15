@@ -19,6 +19,8 @@ Inside Claude Code: `@ask-lake <your question>`, or `! ask-lake "<your question>
 - **It asks when your question could mean more than one thing**, instead of guessing.
 - **It protects the shared cluster.** Queries that would scan too much data are refused
   automatically.
+- **It's for analysis, not exports.** Ask for "all rows" and it offers a count, a sample,
+  summary statistics or a filtered subset instead.
 - **It shows its work, every time**: the answer, the SQL it ran, what it checked, and the caveats.
 - **It leaves a trail.** Every answer ends with a `ref` code linked to a full record of how it was
   produced.
@@ -65,6 +67,9 @@ Slow down and double-check when you see:
 | "Bedrock rejected the credentials" | Your AWS token expired: refresh it |
 | A clarifying question instead of an answer | Answer it, or ask again with the detail included |
 | "Query refused by the scan budget" | Narrow the question: time range, filter, or a smaller table |
+| "I can't return the full table" | It isn't an export tool. Pick one of the options it offers (count, sample, summary, filtered subset). For a real export, ask your data team |
+| "watsonx.data MCP server error … failed twice" | The lakehouse service had a hiccup. Wait a minute and ask again; report it if it keeps happening |
+| "Timed out after 120s" | The query was too slow: narrow the question |
 | "Gave up after 25 steps" | The question is probably too broad: split it into smaller questions |
 | An answer you think is wrong | Report it (below) |
 
