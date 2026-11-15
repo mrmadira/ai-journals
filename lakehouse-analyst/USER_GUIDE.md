@@ -25,6 +25,22 @@ Inside Claude Code: `@ask-lake <your question>`, or `! ask-lake "<your question>
 - **It leaves a trail.** Every answer ends with a `ref` code linked to a full record of how it was
   produced.
 
+## What keeps your data and the cluster safe
+
+- **The analyst can only read.** It has no tools to change, delete or pause anything, and every
+  query is checked to be a single `SELECT` before it runs.
+- **It uses *your* access.** The analyst connects with your own watsonx.data token, so it can see
+  exactly what you can see: no more, no less. Don't ask it about data you wouldn't share in the
+  answer, and remember that what it reads passes through the AI model to produce your answer.
+  *(We're moving it to a dedicated read-only account; this section will change when we do.)*
+- **Big queries are stopped before they start.** Each query's cost is estimated first, and
+  anything that would scan too much data is refused with a suggestion for narrowing it. Queries
+  also time out after 2 minutes, and only two run at once.
+- **The analyst stops waiting on a slow query; the engine may keep running it.** A query that
+  times out on the analyst's side can keep running on the shared engine until it finishes.
+  If you see repeated timeouts, narrow the question rather than retrying. *(Engine-side limits
+  that cancel runaway queries are planned.)*
+
 ## How to get good answers
 
 1. **Be specific when it matters.** You don't *have* to be, because the analyst will ask. But
