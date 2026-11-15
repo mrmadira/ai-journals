@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# ask-lake - run the lakehouse analyst agent from any directory.
+#
+#   ask-lake "Which 5 nations have the most customers in tpchdbiceberg?"   # one question
+#   ask-lake                                                          # interactive session
+#
+# Loads the Bedrock credentials from Claude Code's settings if they aren't already exported,
+# so it works in a fresh terminal. Secrets are never printed.
+set -euo pipefail
+
+# Resolve the real script location, even when called through the ~/.local/bin symlink.
+AGENT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+SETTINGS="$HOME/.claude/settings.json"
+
+for var in AWS_BEARER_TOKEN_BEDROCK AWS_REGION; do
+  if [[ -z "${!var:-}" && -f "$SETTINGS" ]] && command -v jq >/dev/null; then
+    val="$(jq -r --arg v "$var" '.env[$v] // empty' "$SETTINGS")"
+    [[ -n "$val" ]] && export "$var=$val"
+  fi
+  [[ -n "${!var:-}" ]] || { echo "ask-lake: $var is not set (export it, or add it to $SETTINGS under \"env\")" >&2; exit 1; }
+done
+
+[[ -n "${WXD_AUTH:-}" ]] || { echo "ask-lake: WXD_AUTH (the watsonx.data token used by .mcp.json) is not set" >&2; exit 1; }
+
+exec uv run --quiet --project "$AGENT_DIR" python "$AGENT_DIR/agent.py" "$@"
