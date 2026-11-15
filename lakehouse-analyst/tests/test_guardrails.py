@@ -53,3 +53,51 @@ def test_select_only_and_allowlist():
     assert "single SELECT" in check("SELECT 1; DROP TABLE c.s.t")
     tools = agent.Tools(FakeMCP(1), NullLog())
     assert "not permitted" in asyncio.run(tools.check_guardrails("watsonxdata-pause-presto-engine", {}))
+
+
+def test_raw_row_dumps_get_preview_cap():
+    assert agent.is_raw_row_dump("SELECT * FROM c.s.customer")
+    assert agent.is_raw_row_dump("SELECT c_name, c_acctbal FROM c.s.customer ORDER BY c_acctbal DESC")
+    assert agent.is_raw_row_dump("SELECT * FROM c.s.t WHERE_ISH")  # no real WHERE keyword
+    assert not agent.is_raw_row_dump("SELECT * FROM c.s.customer WHERE c_nationkey = 3")
+    assert not agent.is_raw_row_dump("SELECT c_nationkey, COUNT(*) FROM c.s.customer GROUP BY 1")
+    assert agent.is_raw_row_dump("SELECT 'where' AS x FROM c.s.t")  # keyword only inside a string
+    args = {"sql": "SELECT * FROM c.s.customer", "engine_id": "e", "limit": 200}
+    tools = agent.Tools(FakeMCP(1e6), NullLog())
+    assert asyncio.run(tools.check_guardrails("watsonxdata-execute-select", args)) is None
+    assert args["limit"] == agent.PREVIEW_ROWS and args["_preview"]
+
+
+class FlakyMCP(FakeMCP):
+    """Fails once with a server error, then succeeds - like the real transient errors we saw."""
+    def __init__(self):
+        super().__init__(1e6)
+        self.calls = 0
+
+    async def call_tool(self, name, args, read_timeout_seconds=None):
+        self.calls += 1
+        if self.calls == 1:
+            raise RuntimeError("Server returned an error response")
+        assert not any(k.startswith("_") for k in args)  # internal flags never reach the server
+        return await super().call_tool(name, args, read_timeout_seconds)
+
+
+def test_transient_server_error_is_retried_once(monkeypatch):
+    async def no_sleep(_):
+        return None
+    monkeypatch.setattr(agent.asyncio, "sleep", no_sleep)
+    mcp = FlakyMCP()
+    text, is_error = asyncio.run(agent.Tools(mcp, NullLog()).call_mcp("watsonxdata-list-engines", {"_preview": True}))
+    assert not is_error and mcp.calls == 2
+
+
+def test_persistent_server_error_reports_clearly(monkeypatch):
+    async def no_sleep(_):
+        return None
+    monkeypatch.setattr(agent.asyncio, "sleep", no_sleep)
+
+    class BrokenMCP(FakeMCP):
+        async def call_tool(self, *a, **k):
+            raise RuntimeError("Server returned an error response")
+    text, is_error = asyncio.run(agent.Tools(BrokenMCP(1), NullLog()).call_mcp("watsonxdata-list-engines", {}))
+    assert is_error and "not a timeout" in text and "failed twice" in text
