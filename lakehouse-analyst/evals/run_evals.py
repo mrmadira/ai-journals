@@ -10,6 +10,7 @@ regressions, cheap to maintain. Each run is appended to evals/results.jsonl.
 import datetime as dt
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -25,6 +26,13 @@ def grade(case: dict, output: str) -> list[str]:
     if case.get("must_contain_any") and not any(s in answer for s in case["must_contain_any"]):
         problems.append(f"none of {case['must_contain_any']}")
     problems += [f"should not contain {s!r}" for s in case.get("must_not_contain", []) if s in answer]
+    footer = next((ln for ln in output.splitlines() if ln.startswith("— ref ")), "")
+    m = re.search(r"SQL: (\d+) quer(?:y|ies), ([0-9.]+)s on engine", footer)
+    queries, engine_s = (int(m.group(1)), float(m.group(2))) if m else (0, 0.0)
+    if "max_engine_seconds" in case and engine_s > case["max_engine_seconds"]:
+        problems.append(f"{engine_s:.0f}s engine time (max {case['max_engine_seconds']})")
+    if "max_queries" in case and queries > case["max_queries"]:
+        problems.append(f"{queries} queries (max {case['max_queries']})")
     if "max_table_rows" in case:  # Markdown table rows in the answer (header + separator excluded)
         rows = sum(1 for ln in answer.splitlines() if ln.strip().startswith("|")) - 2
         if rows > case["max_table_rows"]:
@@ -45,10 +53,11 @@ def main() -> int:
         output = proc.stdout + proc.stderr
         problems = grade(case, output) if proc.returncode == 0 else [f"exit code {proc.returncode}"]
         ref = next((ln.split()[2] for ln in output.splitlines() if ln.startswith("— ref ")), None)
+        sql = re.search(r"SQL: [^·]*", output)
         results.append({"id": case["id"], "pass": not problems, "problems": problems,
                         "seconds": round(time.time() - start), "ref": ref})
         print(f"{'PASS' if not problems else 'FAIL'}  {case['id']:22} {results[-1]['seconds']:>4}s  "
-              f"ref {ref}  {'; '.join(problems)}")
+              f"ref {ref}  {sql.group(0).strip() if sql else 'no SQL'}  {'; '.join(problems)}")
     passed = sum(r["pass"] for r in results)
     print(f"\n{passed}/{len(results)} passed")
     with (HERE / "results.jsonl").open("a") as f:

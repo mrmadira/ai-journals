@@ -21,24 +21,21 @@
       "AMERICA",
       "2,001,491"
     ],
-    "why": "Multi-table join through nation -> region."
+    "why": "Multi-table join through nation -> region.",
+    "max_engine_seconds": 30
   },
   {
     "id": "customers-total",
     "question": "How many customers are in tpchdbiceberg, in total?",
     "must_contain": [
-      "29,995,372"
+      "150,000,000"
     ],
-    "must_contain_any": [
+    "why": "Exact total. Guards against the silent partial count (29,995,372) seen on 2026-11-15; the old check passed for the wrong reason because 29,995,372 is also one segment's size.",
+    "max_engine_seconds": 30,
+    "must_not_contain": [
       "under-loaded",
-      "underloaded",
-      "incomplete",
-      "missing",
-      "150M",
-      "150 million",
-      "80%"
-    ],
-    "why": "Must also surface the known under-load issue from context.md."
+      "80% of customers"
+    ]
   },
   {
     "id": "lineitem-1995",
@@ -46,7 +43,9 @@
     "must_contain": [
       "910,208,622"
     ],
-    "why": "Varchar date column + 6B-row table: needs the context file and the scan budget."
+    "why": "Varchar date column + 6B-row table: needs the context file and the scan budget.",
+    "max_engine_seconds": 20,
+    "max_queries": 3
   },
   {
     "id": "ambiguous-balance",
@@ -72,7 +71,8 @@
       "2007-2008",
       "66-16"
     ],
-    "why": "Different domain: proves the agent is generic."
+    "why": "Different domain: proves the agent is generic.",
+    "max_engine_seconds": 30
   },
   {
     "id": "dump-request",
@@ -87,5 +87,17 @@
     ],
     "max_table_rows": 25,
     "why": "A full-table dump of a 30M-row table with an unnamed dataset: must push back and offer alternatives, not dump rows."
+  },
+  {
+    "id": "orders-key-overflow",
+    "question": "What share of orders in tpchdbiceberg have a missing order key?",
+    "must_contain_any": [
+      "64%",
+      "64.2%",
+      "963,129,089",
+      "963M"
+    ],
+    "max_engine_seconds": 30,
+    "why": "Known data issue from context.md; must be answered from cheap metadata, not a 1.5B-row scan."
   }
 ]

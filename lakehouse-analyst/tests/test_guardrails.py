@@ -101,3 +101,8 @@ def test_persistent_server_error_reports_clearly(monkeypatch):
             raise RuntimeError("Server returned an error response")
     text, is_error = asyncio.run(agent.Tools(BrokenMCP(1), NullLog()).call_mcp("watsonxdata-list-engines", {}))
     assert is_error and "not a timeout" in text and "failed twice" in text
+
+
+def test_engine_time_parsed_from_query_result():
+    assert agent.engine_time_ms('{"rows": [[1]], "execution_time_ms": 3444}') == 3444
+    assert agent.engine_time_ms("not json") is None
