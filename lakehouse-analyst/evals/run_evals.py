@@ -25,6 +25,10 @@ def grade(case: dict, output: str) -> list[str]:
     if case.get("must_contain_any") and not any(s in answer for s in case["must_contain_any"]):
         problems.append(f"none of {case['must_contain_any']}")
     problems += [f"should not contain {s!r}" for s in case.get("must_not_contain", []) if s in answer]
+    if "max_table_rows" in case:  # Markdown table rows in the answer (header + separator excluded)
+        rows = sum(1 for ln in answer.splitlines() if ln.strip().startswith("|")) - 2
+        if rows > case["max_table_rows"]:
+            problems.append(f"{rows} table rows (max {case['max_table_rows']})")
     return problems
 
 

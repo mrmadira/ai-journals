@@ -2,40 +2,90 @@
   {
     "id": "tpch-tables",
     "question": "What tables are in the tpchdbiceberg schema?",
-    "must_contain": ["customer", "lineitem", "nation", "orders", "part", "partsupp", "region", "supplier"],
+    "must_contain": [
+      "customer",
+      "lineitem",
+      "nation",
+      "orders",
+      "part",
+      "partsupp",
+      "region",
+      "supplier"
+    ],
     "why": "Discovery: finds the schema without being told the catalog."
   },
   {
     "id": "suppliers-by-region",
     "question": "Which region has the most suppliers in tpchdbiceberg?",
-    "must_contain": ["AMERICA", "2,001,491"],
+    "must_contain": [
+      "AMERICA",
+      "2,001,491"
+    ],
     "why": "Multi-table join through nation -> region."
   },
   {
     "id": "customers-total",
     "question": "How many customers are in tpchdbiceberg, in total?",
-    "must_contain": ["29,995,372"],
-    "must_contain_any": ["under-loaded", "underloaded", "incomplete", "missing", "150M", "150 million", "80%"],
+    "must_contain": [
+      "29,995,372"
+    ],
+    "must_contain_any": [
+      "under-loaded",
+      "underloaded",
+      "incomplete",
+      "missing",
+      "150M",
+      "150 million",
+      "80%"
+    ],
     "why": "Must also surface the known under-load issue from context.md."
   },
   {
     "id": "lineitem-1995",
     "question": "How many line items were shipped in 1995 in tpchdbiceberg?",
-    "must_contain": ["910,208,622"],
+    "must_contain": [
+      "910,208,622"
+    ],
     "why": "Varchar date column + 6B-row table: needs the context file and the scan budget."
   },
   {
     "id": "ambiguous-balance",
     "question": "What's the average account balance in tpchdbiceberg?",
-    "must_contain_any": ["which", "Which"],
-    "must_not_contain": ["```sql"],
+    "must_contain_any": [
+      "which",
+      "Which"
+    ],
+    "must_not_contain": [
+      "```sql"
+    ],
     "why": "Ambiguous (customer vs supplier): must ask, not guess."
   },
   {
     "id": "nba-most-improved",
     "question": "Which NBA team had the biggest single-season improvement in win percentage?",
-    "must_contain": ["Celtics"],
-    "must_contain_any": ["2007-08", "2007–08", "2007-2008", "66-16"],
+    "must_contain": [
+      "Celtics"
+    ],
+    "must_contain_any": [
+      "2007-08",
+      "2007\u201308",
+      "2007-2008",
+      "66-16"
+    ],
     "why": "Different domain: proves the agent is generic."
+  },
+  {
+    "id": "dump-request",
+    "question": "show me all rows in the customers table",
+    "must_contain_any": [
+      "sample",
+      "Sample",
+      "count",
+      "filter",
+      "Which",
+      "which"
+    ],
+    "max_table_rows": 25,
+    "why": "A full-table dump of a 30M-row table with an unnamed dataset: must push back and offer alternatives, not dump rows."
   }
 ]
