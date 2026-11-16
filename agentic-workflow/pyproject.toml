@@ -1,0 +1,11 @@
+[project]
+name = "lakehouse-agentic-workflow"
+version = "0.1.0"
+description = "Fixed-step lakehouse brief: code controls the steps, agents and one LLM call work inside them"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic[bedrock]>=2.8.0",
+]
+
+[dependency-groups]
+dev = ["pytest>=9.2.0"]
