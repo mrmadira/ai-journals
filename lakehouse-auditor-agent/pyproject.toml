@@ -1,0 +1,15 @@
+[project]
+name = "lakehouse-auditor"
+version = "0.1.0"
+description = "Scheduled watsonx.data audit agent with human-in-the-loop approval, built on Claude"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic[bedrock,mcp]>=2.8.0",
+    "mcp>=2.3.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]

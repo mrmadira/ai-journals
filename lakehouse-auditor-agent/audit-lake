@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# audit-lake - the scheduled lakehouse audit agent.
+#
+#   audit-lake run                       # unattended audit (what cron/launchd calls)
+#   audit-lake status                    # pending proposals + latest report
+#   audit-lake review [--dry-run]        # approve/reject proposals interactively
+#   audit-lake approve <id> [--dry-run] [--confirm <engine_id>]
+#   audit-lake reject  <id> [--note "why"]
+#
+# Exit codes (for schedulers): 0 = clean, 2 = needs your attention, 1 = failed.
+# Credentials come from the environment; Bedrock ones fall back to ~/.claude/settings.json.
+# Secrets are never printed.
+set -euo pipefail
+
+AGENT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+SETTINGS="$HOME/.claude/settings.json"
+export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"   # launchd/cron start with a bare PATH
+
+if [[ "${1:-}" == "run" ]]; then   # only `run` talks to the model
+  for var in AWS_BEARER_TOKEN_BEDROCK AWS_REGION; do
+    if [[ -z "${!var:-}" && -f "$SETTINGS" ]] && command -v jq >/dev/null; then
+      val="$(jq -r --arg v "$var" '.env[$v] // empty' "$SETTINGS")"
+      [[ -n "$val" ]] && export "$var=$val"
+    fi
+    [[ -n "${!var:-}" ]] || { echo "audit-lake: $var is not set" >&2; exit 1; }
+  done
+fi
+if [[ "${1:-}" != "status" && -z "${WXD_AUTH:-}" ]]; then
+  # Unattended runs can't inherit your shell's exports: allow a private env file.
+  ENV_FILE="${AUDIT_ENV_FILE:-$HOME/.config/audit-lake/env}"
+  if [[ -f "$ENV_FILE" ]]; then
+    [[ "$(stat -f %Lp "$ENV_FILE" 2>/dev/null || stat -c %a "$ENV_FILE")" == "600" ]] \
+      || { echo "audit-lake: $ENV_FILE must be chmod 600" >&2; exit 1; }
+    set -a; source "$ENV_FILE"; set +a
+  fi
+  [[ -n "${WXD_AUTH:-}" ]] || { echo "audit-lake: WXD_AUTH (watsonx.data token used by .mcp.json) is not set" >&2; exit 1; }
+fi
+
+exec uv run --quiet --project "$AGENT_DIR" python "$AGENT_DIR/auditor.py" "$@"
