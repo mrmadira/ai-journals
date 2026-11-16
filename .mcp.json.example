@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "watsonx.data-mcp-server": {
+      "type": "http",
+      "url": "https://<region>.lakehouse.cloud.ibm.com/api/v1/watsonxdata/mcp",
+      "headers": {
+        "authorization": "Basic ${WXD_AUTH}",
+        "authinstanceid": "${WXD_INSTANCE_ID}"
+      }
+    }
+  }
+}

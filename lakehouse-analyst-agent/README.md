@@ -11,7 +11,7 @@ schema and tables by itself, writes SQL, recovers from errors, and sanity-checks
 **1. Prerequisites:** [uv](https://docs.astral.sh/uv/), an AWS account with Claude enabled on
 Amazon Bedrock, and an IBM watsonx.data instance.
 
-**2. Create `.mcp.json` at the repo root** (two folders above `agent.py`). It tells the agent
+**2. Create `.mcp.json` at the repo root** (copy `.mcp.json.example`, one folder above `agent.py`). It tells the agent
 how to reach the watsonx.data MCP server. Keep secrets as `${VAR}` placeholders. They're filled
 in from environment variables when the agent runs, so the file never holds a real token.
 **Don't commit this file.**
@@ -35,7 +35,7 @@ in from environment variables when the agent runs, so the file never holds a rea
 any directory:
 
 ```bash
-cd agents/analyst
+cd lakehouse-analyst-agent
 chmod +x ask-lake
 ln -s "$PWD/ask-lake" ~/.local/bin/ask-lake   # ~/.local/bin must be on your PATH
 ```
@@ -55,10 +55,10 @@ ask-lake "What tables are in the tpchdbiceberg schema?"   # one question
 ask-lake                                                  # interactive (follow-ups remember context)
 ```
 
-Without the wrapper: `cd agents/analyst && uv run python agent.py "..."`.
+Without the wrapper: `cd lakehouse-analyst-agent && uv run python agent.py "..."`.
 
-Inside Claude Code, prefix with `!` (`! ask-lake "..."`), or use the `@ask-lake` subagent
-(`.claude/agents/ask-lake.md`), which relays your question to this agent.
+Inside Claude Code, prefix with `!` (`! ask-lake "..."`), or define a small subagent (for example
+`.claude/agents/ask-lake.md`) that relays your question to this agent.
 
 **Output:** in a terminal, colors are shown and the Markdown answer is rendered. When the output
 is captured (a pipe, a log, or Claude Code's `!`), it's plain text. Set `NO_COLOR=1` to force plain.

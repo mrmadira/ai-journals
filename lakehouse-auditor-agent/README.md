@@ -46,7 +46,8 @@ The model never sees `execute-select` or any pause/create/update/delete tool.
 
 Same `.mcp.json` and credentials as the analyst (`WXD_AUTH`, `AWS_BEARER_TOKEN_BEDROCK`, `AWS_REGION`).
 For scheduled runs, put `WXD_AUTH=...` in `~/.config/audit-lake/env` (`chmod 600`); launchd doesn't
-see your shell exports. Then see `launchd/com.wxd.audit-lake.plist` (weekdays 07:00, macOS notification).
+see your shell exports. Then schedule `audit-lake run` with launchd or cron (e.g. weekdays 07:00), with
+`AUDIT_NOTIFY=macos` for a desktop notification. Reports go to `audits/` at the repo root.
 
 Tune with env vars: `AUDIT_MIN_IDLE_HOURS` (2), `AUDIT_PROPOSAL_TTL_HOURS` (24), `AUDIT_SNOOZE_DAYS` (7),
 `AUDIT_MAX_STEPS` (60), `AUDIT_RUN_TIMEOUT_S` (1500), `AUDIT_MAX_INPUT_TOKENS` (3M).

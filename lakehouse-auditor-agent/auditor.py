@@ -51,7 +51,7 @@ from state import ActivityStore, AlreadyRunning, ProposalStore, run_lock
 
 # ── Configuration (env-overridable) ───────────────────────────────────────────
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parents[1]
+REPO = HERE.parent                      # repo root: holds .mcp.json and audits/
 MODEL = "anthropic.claude-opus-5-5"
 FALLBACK_MODEL = "anthropic.claude-opus-4-8"           # only if the primary declines a request
 MAX_STEPS = int(os.environ.get("AUDIT_MAX_STEPS", 60))

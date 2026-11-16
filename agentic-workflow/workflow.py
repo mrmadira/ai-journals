@@ -2,7 +2,7 @@
 
 COMPARE WITH THE AGENTIC ORCHESTRATOR
 -------------------------------------
-The orchestrator (agents/agentic-orchestrator) is an agent: the MODEL decides which specialist to
+The orchestrator (../agentic-orchestrator) is an agent: the MODEL decides which specialist to
 call, in what order, and when it is done. This file is the opposite. The sequence below is plain
 Python and runs the same way every time. Models are used only where judgment is needed:
 
@@ -40,10 +40,10 @@ from anthropic import AsyncAnthropicBedrockMantle, BetaRefusalFallbackMiddleware
 # ── Configuration ─────────────────────────────────────────────────────────────
 HERE = Path(__file__).resolve().parent
 AGENTS = HERE.parent
-REPO = AGENTS.parent
-ANALYST_CMD = AGENTS / "analyst" / "ask-lake"
-AUDITOR_CMD = AGENTS / "auditor" / "audit-lake"
-PROPOSALS = AGENTS / "auditor" / "state" / "proposals.json"
+REPO = AGENTS                           # repo root: holds .mcp.json, audits/, briefs/
+ANALYST_CMD = AGENTS / "lakehouse-analyst-agent" / "ask-lake"
+AUDITOR_CMD = AGENTS / "lakehouse-auditor-agent" / "audit-lake"
+PROPOSALS = AGENTS / "lakehouse-auditor-agent" / "state" / "proposals.json"
 REPORT_DIR = Path(os.environ.get("AUDIT_REPORT_DIR", REPO / "audits"))
 BRIEF_DIR = Path(os.environ.get("BRIEF_DIR", REPO / "briefs"))
 LOG_DIR = HERE / "logs"

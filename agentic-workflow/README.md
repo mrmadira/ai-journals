@@ -27,7 +27,7 @@ Annotated with the first live run (2026-11-16, ref `f5940b`):
                 │ report.md
                 ▼
  ┌──────────────────────────────┐
- │ ░ 2. SELECT                  │   read auditor/state/proposals.json
+ │ ░ 2. SELECT                  │   read lakehouse-auditor-agent/state/proposals.json
  │   pending + not expired      │   keep ≤ 5           (today: f880f4→presto4,
  │   (the model never picks)    │                              b9078e→spark16)
  └──────────────┬───────────────┘
@@ -77,7 +77,7 @@ Annotated with the first live run (2026-11-16, ref `f5940b`):
 | # | Step | Who | What |
 |---|---|---|---|
 | 1 | audit | code | reuse `audits/agent-audit-*.md` if fresh, otherwise run `audit-lake run` |
-| 2 | select | code | pending, unexpired proposals from `auditor/state/proposals.json` (max 5) |
+| 2 | select | code | pending, unexpired proposals from `lakehouse-auditor-agent/state/proposals.json` (max 5) |
 | 3 | assess | **agents** | one `ask-lake` run per proposed engine, 2 in parallel, from a fixed question template |
 | 4 | summarize | **LLM** | one call with a JSON schema → headline, risks, recommendation per proposal |
 | 5 | validate | code | removes proposal ids the summary invented, adds ones it skipped, blocks "approve" without an assessment |

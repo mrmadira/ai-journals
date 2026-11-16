@@ -48,9 +48,9 @@ from anthropic import AsyncAnthropicBedrockMantle, BetaFallbackState, BetaRefusa
 # ── Configuration ─────────────────────────────────────────────────────────────
 HERE = Path(__file__).resolve().parent
 AGENTS = HERE.parent
-REPO = AGENTS.parent
-ANALYST_CMD = AGENTS / "analyst" / "ask-lake"
-AUDITOR_CMD = AGENTS / "auditor" / "audit-lake"
+REPO = AGENTS                           # repo root: holds .mcp.json, audits/, briefs/
+ANALYST_CMD = AGENTS / "lakehouse-analyst-agent" / "ask-lake"
+AUDITOR_CMD = AGENTS / "lakehouse-auditor-agent" / "audit-lake"
 REPORT_DIR = Path(os.environ.get("AUDIT_REPORT_DIR", REPO / "audits"))
 LOG_DIR = HERE / "logs"
 

@@ -1,0 +1,21 @@
+# ── Private: never commit ─────────────────────────────────────────────
+# Real MCP config (instance CRN, endpoint). Commit .mcp.json.example instead.
+.mcp.json
+# Agent output about YOUR lakehouse: reports, briefs, audit trails, live state
+audits/
+briefs/
+**/logs/
+**/state/
+**/drafts/
+**/evals/results.jsonl
+# Local secrets for scheduled runs, and local Claude Code settings
+.env
+*.env
+**/.claude/settings.local.json
+
+# ── Build and OS junk ─────────────────────────────────────────────────
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store

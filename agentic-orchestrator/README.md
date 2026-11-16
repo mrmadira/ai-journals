@@ -117,7 +117,7 @@ There is no approve tool. Pausing anything still goes through `audit-lake review
 
 ## Tracing
 The footer shows the coordinator's ref, the token split (coordinator vs specialists) and the analyst
-refs. `grep <ref> ../analyst/logs/*.jsonl` shows every SQL statement behind an answer.
+refs. `grep <ref> ../lakehouse-analyst-agent/logs/*.jsonl` shows every SQL statement behind an answer.
 
 Tune with `ORCH_MAX_STEPS` (15), `ORCH_MAX_DELEGATIONS` (6), `ORCH_MAX_PARALLEL` (2),
 `ORCH_ANALYST_TIMEOUT_S` (900), `ORCH_AUDIT_TIMEOUT_S` (1800).
