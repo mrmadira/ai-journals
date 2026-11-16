@@ -1,0 +1,8 @@
+[project]
+name = "lakehouse-orchestrator"
+version = "0.1.0"
+description = "Multi-agent coordinator that delegates to the lakehouse analyst and audit agents"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic[bedrock]>=2.8.0",
+]

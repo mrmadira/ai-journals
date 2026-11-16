@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# ask-team - the lakehouse orchestrator: one coordinator that delegates to the analyst and auditor.
+#
+#   ask-team "Which idle engines could we pause, and is anyone still using the data they serve?"
+#   ask-team            # interactive session
+#
+# Needs the same credentials as the specialists (it starts them as separate processes).
+set -euo pipefail
+
+AGENT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+SETTINGS="$HOME/.claude/settings.json"
+
+for var in AWS_BEARER_TOKEN_BEDROCK AWS_REGION; do
+  if [[ -z "${!var:-}" && -f "$SETTINGS" ]] && command -v jq >/dev/null; then
+    val="$(jq -r --arg v "$var" '.env[$v] // empty' "$SETTINGS")"
+    [[ -n "$val" ]] && export "$var=$val"
+  fi
+  [[ -n "${!var:-}" ]] || { echo "ask-team: $var is not set" >&2; exit 1; }
+done
+[[ -n "${WXD_AUTH:-}" ]] || { echo "ask-team: WXD_AUTH is not set (the analyst and auditor need it)" >&2; exit 1; }
+
+exec uv run --quiet --project "$AGENT_DIR" python "$AGENT_DIR/orchestrator.py" "$@"
